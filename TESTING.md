@@ -17,14 +17,19 @@ GitHub Actions runs the test suite on pushes to `main`, `develop`, and `feature/
 
 ## Codecov
 
-The workflow uploads `coverage.xml` to Codecov when the repository is configured for uploads.
+This repository includes `codecov.yml` plus a GitHub Actions upload step using `codecov/codecov-action@v5`.
 
-To finish Codecov setup:
+Recommended setup for this public repository:
 
-1. Install the Codecov GitHub app for this repository.
-2. If Codecov requires upload tokens for this repository, add `CODECOV_TOKEN` as a repository secret.
-3. Open a pull request to confirm coverage reports appear.
+1. Install the Codecov GitHub app for `Spitfire-Cowboy/talos`.
+2. In Codecov settings, allow tokenless uploads for public repositories **or** add `CODECOV_TOKEN` if you prefer token-based uploads.
+3. Open a pull request and confirm that `coverage.xml` is processed.
 
 ## CodeRabbit
 
-This repository includes a root `.coderabbit.yaml` file so repository-level review behavior is version controlled once the CodeRabbit GitHub app is installed.
+This repository includes a root `.coderabbit.yaml` file so review behavior is version controlled.
+
+To finish setup:
+
+1. Install the CodeRabbit GitHub app for `Spitfire-Cowboy/talos`.
+2. Open a pull request to let CodeRabbit read the repository config from the feature branch under review.
