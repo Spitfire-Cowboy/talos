@@ -1,5 +1,7 @@
 # Talos
 
+![Talos hero](docs/images/talos-final.jpg)
+
 > Deterministic WIP enforcement that turns workload pressure into guardrails against overload and thrash.
 
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
