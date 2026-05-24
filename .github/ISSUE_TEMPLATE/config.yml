@@ -2,4 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: Security reports
     url: https://github.com/Spitfire-Cowboy/talos/security/policy
-    about: Placeholder only. Replace this URL before publishing. Do not use public issues for suspected vulnerabilities.
+    about: Do not use public issues for suspected vulnerabilities. Follow SECURITY.md.
