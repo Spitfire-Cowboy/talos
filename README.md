@@ -4,9 +4,10 @@
 
 > Deterministic WIP enforcement that turns workload pressure into guardrails against overload and thrash.
 
-![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
-![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
+[![CI](https://github.com/Spitfire-Cowboy/talos/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/Spitfire-Cowboy/talos/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Spitfire-Cowboy/talos/graph/badge.svg)](https://codecov.io/gh/Spitfire-Cowboy/talos)
 
 Named after Talos, the bronze guardian of Crete, this project is built around protection through deterministic guardrails.
 

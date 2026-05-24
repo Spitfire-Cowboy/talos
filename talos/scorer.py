@@ -3,10 +3,21 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
-TALOS_CYCLES_FILE = Path(os.environ.get("TALOS_CYCLES_FILE", "/tmp/talos-cycles.json"))
+logger = logging.getLogger(__name__)
+
+
+def _default_cycles_file() -> Path:
+    configured = os.environ.get("TALOS_CYCLES_FILE")
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".config" / "talos" / "cycles.json"
+
+
+TALOS_CYCLES_FILE = _default_cycles_file()
 
 
 def compute_talos_level(
@@ -42,10 +53,11 @@ def load_cycles() -> dict:
 
 
 def save_cycles(level: int, count: int, last_backlog: int) -> None:
-    """Persist cycle counter across restarts. Fail closed on write errors."""
+    """Persist cycle counter across restarts and log failures."""
     try:
+        TALOS_CYCLES_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         TALOS_CYCLES_FILE.write_text(
             json.dumps({"level": level, "count": count, "last_backlog": last_backlog})
         )
     except Exception:
-        pass
+        logger.warning("Failed to persist cycles to %s", TALOS_CYCLES_FILE, exc_info=True)
