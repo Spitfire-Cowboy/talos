@@ -1,14 +1,15 @@
 import json
-import subprocess
-import sys
+
+import pytest
+
+from talos import cli
 
 
-def test_talos_score_command_outputs_level() -> None:
-    result = subprocess.run(
+def test_talos_score_command_outputs_level(capsys, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
         [
-            sys.executable,
-            "-m",
-            "talos.cli",
+            "talos",
             "score",
             "--wip-total",
             "10",
@@ -21,8 +22,13 @@ def test_talos_score_command_outputs_level() -> None:
             "--cycles-at-current-level",
             "2",
         ],
-        check=True,
-        capture_output=True,
-        text=True,
     )
-    assert json.loads(result.stdout) == {"talos_level": 3}
+    assert cli.main() == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {"talos_level": 3}
+
+
+def test_parser_requires_a_subcommand() -> None:
+    parser = cli.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
