@@ -68,6 +68,12 @@ python -m pip install -e .[dev]
 pytest --cov=talos --cov-report=term-missing --cov-report=xml
 ```
 
+## CLI
+
+```bash
+talos score --wip-total 10 --global-max 10 --at-cap alpha --backlog-delta 0 --cycles-at-current-level 2
+```
+
 ## MLX deployment notes
 
 A Talos process observed on the maintainer's machine is running as a Python service that watches MLX-related logs and writes JSONL summaries.
