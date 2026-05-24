@@ -16,6 +16,8 @@ This repository currently publishes the Talos Python scoring core plus repositor
 
 The public Python core has been verified on macOS and in a Linux container.
 
+Current Linux verification is limited to source install plus test execution in `python:3.12-slim`.
+
 The documented MLX-oriented service deployment remains a macOS-specific setup.
 
 ## Not currently published

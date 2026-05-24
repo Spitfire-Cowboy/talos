@@ -13,7 +13,35 @@ pytest --cov=talos --cov-report=term-missing --cov-report=xml
 
 ## Linux verification
 
-The current Talos Python core has also been verified in a fresh `python:3.12-slim` Linux container with the same install-and-test flow.
+The current Talos Python core has also been verified in a fresh `python:3.12-slim` Linux container.
+
+The verification flow used:
+
+```bash
+docker run --rm \
+  -v "$PWD":/src \
+  -w /src \
+  python:3.12-slim \
+  bash -lc '
+    python -m venv .venv-linux-test
+    . .venv-linux-test/bin/activate
+    python -m pip install --upgrade pip
+    python -m pip install -e .[dev]
+    pytest --cov=talos --cov-report=term-missing --cov-report=xml
+  '
+```
+
+What this verifies today:
+
+- package install from source on Linux
+- test execution on Linux
+- parity for the current public Python core
+
+What this does not verify yet:
+
+- a Linux daemon/service wrapper
+- Linux packaging or distribution artifacts
+- an MLX deployment on Linux
 
 ## Continuous integration
 

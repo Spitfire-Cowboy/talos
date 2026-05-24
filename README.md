@@ -25,6 +25,21 @@ The public code in this repository currently includes a small Python scoring cor
 
 The current Talos Python core has been verified in local development on macOS and in a Linux container.
 
+### Verified Linux scope
+
+Linux verification currently means:
+
+- the package installs from source in `python:3.12-slim`
+- the current test suite passes in that container
+- the public Python core behaves the same there as it does on macOS
+
+This does **not** currently claim:
+
+- a Linux service wrapper
+- a Linux-specific daemon setup
+- an MLX deployment on Linux
+- broader distribution testing beyond the containerized Python environment above
+
 The currently observed MLX-oriented service deployment is separate from the core package and is still documented as a macOS-specific setup.
 
 ## What ships today
