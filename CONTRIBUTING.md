@@ -4,9 +4,9 @@ Thanks for your interest.
 
 ## Current scope
 
-This repository currently contains documentation and repository scaffolding only.
+This repository currently contains the Talos Python scoring core, tests, and supporting documentation.
 
-Contributions should stay within that scope unless the repository contents change.
+Contributions should stay within the public repository contents unless the shipped scope changes.
 
 ## Before opening a pull request
 

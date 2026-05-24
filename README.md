@@ -95,6 +95,16 @@ save_cycles(level=level, count=next_count, last_backlog=12)
 print({"talos_level": level, "cycles_at_level": next_count})
 ```
 
+## Persistence
+
+By default, Talos stores cycle state at `~/.config/talos/cycles.json`.
+
+To override that location, set `TALOS_CYCLES_FILE` before running Talos:
+
+```bash
+export TALOS_CYCLES_FILE=/path/to/talos-cycles.json
+```
+
 ## MLX deployment notes
 
 A Talos process observed on the maintainer's machine is running as a Python service that watches MLX-related logs and writes JSONL summaries.
