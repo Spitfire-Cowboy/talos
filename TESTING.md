@@ -11,6 +11,10 @@ python -m pip install -e .[dev]
 pytest --cov=talos --cov-report=term-missing --cov-report=xml
 ```
 
+## Linux verification
+
+The current Talos Python core has also been verified in a fresh `python:3.12-slim` Linux container with the same install-and-test flow.
+
 ## Continuous integration
 
 GitHub Actions runs the test suite on pushes to `main`, `develop`, and `feature/**`, and on pull requests.

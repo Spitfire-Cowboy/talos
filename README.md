@@ -21,6 +21,12 @@ The public code in this repository currently includes a small Python scoring cor
 - persists cycle counters across runs
 - stays dependency-light and deterministic
 
+## Platform support
+
+The current Talos Python core has been verified in local development on macOS and in a Linux container.
+
+The currently observed MLX-oriented service deployment is separate from the core package and is still documented as a macOS-specific setup.
+
 ## What ships today
 
 This repository currently ships:
