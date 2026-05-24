@@ -45,7 +45,11 @@ What this does not verify yet:
 
 ## Continuous integration
 
-GitHub Actions runs the test suite on pushes to `main`, `develop`, and `feature/**`, and on pull requests.
+GitHub Actions runs:
+
+- a Python version matrix on pushes and pull requests
+- coverage upload from the Python 3.12 test run
+- a packaging job that builds distribution artifacts and smoke-tests the installed wheel
 
 ## Codecov
 

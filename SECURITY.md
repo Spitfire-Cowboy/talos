@@ -15,13 +15,14 @@ Include, when available:
 
 ## Current scope
 
-This repository currently contains repository scaffolding and documentation.
+This repository currently contains the Talos Python scoring core, tests, and supporting documentation.
 
 Report privately if you find:
 
 - exposed secrets or credentials
 - non-public references or URLs
 - unsafe workflow or automation configuration
+- security-sensitive behavior in the public package or CLI
 - other security-sensitive repository content
 
 ## Public disclosure
