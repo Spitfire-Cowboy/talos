@@ -44,3 +44,12 @@ def test_save_cycles_logs_failures(monkeypatch, caplog) -> None:
     with caplog.at_level("WARNING"):
         scorer.save_cycles(level=1, count=2, last_backlog=3)
     assert "Failed to persist cycles" in caplog.text
+
+
+def test_save_cycles_writes_atomically(tmp_path: Path, monkeypatch) -> None:
+    target = tmp_path / "cycles.json"
+    monkeypatch.setattr(scorer, "TALOS_CYCLES_FILE", target)
+    scorer.save_cycles(level=7, count=8, last_backlog=9)
+    assert target.exists()
+    assert not target.with_suffix(".json.tmp").exists()
+    assert scorer.load_cycles() == {"level": 7, "count": 8, "last_backlog": 9}

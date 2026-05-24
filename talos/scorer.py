@@ -56,8 +56,9 @@ def save_cycles(level: int, count: int, last_backlog: int) -> None:
     """Persist cycle counter across restarts and log failures."""
     try:
         TALOS_CYCLES_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        TALOS_CYCLES_FILE.write_text(
-            json.dumps({"level": level, "count": count, "last_backlog": last_backlog})
-        )
+        payload = json.dumps({"level": level, "count": count, "last_backlog": last_backlog})
+        tmp_file = TALOS_CYCLES_FILE.with_suffix(f"{TALOS_CYCLES_FILE.suffix}.tmp")
+        tmp_file.write_text(payload, encoding="utf-8")
+        tmp_file.replace(TALOS_CYCLES_FILE)
     except Exception:
         logger.warning("Failed to persist cycles to %s", TALOS_CYCLES_FILE, exc_info=True)
