@@ -37,9 +37,9 @@ def main() -> int:
         print(json.dumps({"talos_level": level}))
         return 0
 
-    parser.error(f"unknown command: {args.command}")
-    return 2
+    parser.error(f"unknown command: {args.command}")  # pragma: no cover
+    return 2  # pragma: no cover
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
