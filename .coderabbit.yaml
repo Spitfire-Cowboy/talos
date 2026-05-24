@@ -8,5 +8,7 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-chat:
-  auto_reply: true
+    base_branches:
+      - "develop"
+  chat:
+    auto_reply: true
