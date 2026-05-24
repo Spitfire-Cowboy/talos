@@ -1,34 +1,51 @@
 # Talos
 
+![Talos hero](docs/images/talos-final.jpg)
+
 > Deterministic WIP enforcement that turns workload pressure into guardrails against overload and thrash.
 
-![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
-![Status: Docs only](https://img.shields.io/badge/status-docs--only-lightgrey.svg)
-![Core: Python](https://img.shields.io/badge/core-Python-3776AB.svg)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
+[![CI](https://github.com/Spitfire-Cowboy/talos/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/Spitfire-Cowboy/talos/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Spitfire-Cowboy/talos/graph/badge.svg)](https://codecov.io/gh/Spitfire-Cowboy/talos)
 
 Named after Talos, the bronze guardian of Crete, this project is built around protection through deterministic guardrails.
 
----
+## What Talos is
 
 Talos is a deterministic enforcement engine for work-in-progress pressure.
 
-From the code and running deployment reviewed so far, Talos computes enforcement levels from workload and backlog signals, then raises guardrails as limits are exceeded.
+The public code in this repository currently includes a small Python scoring core that:
+
+- computes enforcement levels from workload and backlog signals
+- persists cycle counters across runs
+- stays dependency-light and deterministic
 
 ## What ships today
 
-This public repository currently ships documentation and repository scaffolding only:
+This repository currently ships:
 
-- project and policy documents
-- GitHub issue and pull request templates
-- public-safety checks for publication
+- the Python scoring core in `talos/`
+- automated tests for scoring and persistence behavior
+- GitHub Actions CI for test and coverage runs
+- Codecov and CodeRabbit configuration files
+- repository documentation
 - verified notes about the current MLX-oriented deployment shape
 
-It does **not** currently publish:
+It does **not** currently ship:
 
-- application source code
 - packaged binaries
-- end-to-end setup for production use
 - a public MLX monitor implementation
+- end-to-end production deployment automation
+
+## Quick start
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .[dev]
+pytest --cov=talos --cov-report=term-missing --cov-report=xml
+```
 
 ## MLX deployment notes
 
@@ -36,20 +53,13 @@ A Talos process observed on the maintainer's machine is running as a Python serv
 
 See [Running with MLX](RUNNING_WITH_MLX.md).
 
-## Repository checks
-
-```bash
-bash scripts/check-public-safety.sh
-bash scripts/check-public-safety.sh --strict-public
-```
-
 ## Documentation
 
 - [Documentation overview](docs/OVERVIEW.md)
 - [Running with MLX](RUNNING_WITH_MLX.md)
+- [Testing](TESTING.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
-- [Public repo checklist](PUBLIC_REPO_CHECKLIST.md)
 
 ## License
 

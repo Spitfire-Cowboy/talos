@@ -21,3 +21,8 @@ build/
 *.log
 *.tmp
 *.swp
+
+# Coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
