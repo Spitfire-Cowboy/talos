@@ -21,6 +21,27 @@ The public code in this repository currently includes a small Python scoring cor
 - persists cycle counters across runs
 - stays dependency-light and deterministic
 
+## Platform support
+
+The current Talos Python core has been verified in local development on macOS and in a Linux container.
+
+### Verified Linux scope
+
+Linux verification currently means:
+
+- the package installs from source in `python:3.12-slim`
+- the current test suite passes in that container
+- the public Python core behaves the same there as it does on macOS
+
+This does **not** currently claim:
+
+- a Linux service wrapper
+- a Linux-specific daemon setup
+- an MLX deployment on Linux
+- broader distribution testing beyond the containerized Python environment above
+
+The currently observed MLX-oriented service deployment is separate from the core package and is still documented as a macOS-specific setup.
+
 ## What ships today
 
 This repository currently ships:
@@ -45,6 +66,33 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .[dev]
 pytest --cov=talos --cov-report=term-missing --cov-report=xml
+```
+
+## CLI
+
+```bash
+talos score --wip-total 10 --global-max 10 --at-cap alpha --backlog-delta 0 --cycles-at-current-level 2
+```
+
+## API usage
+
+```python
+from talos import compute_talos_level, load_cycles, save_cycles
+
+state = load_cycles()
+
+level = compute_talos_level(
+    wip_total=8,
+    global_max=10,
+    at_cap_projects=["alpha"],
+    backlog_delta=2,
+    cycles_at_current_level=state["count"],
+)
+
+next_count = state["count"] + 1 if level == state["level"] else 1
+save_cycles(level=level, count=next_count, last_backlog=12)
+
+print({"talos_level": level, "cycles_at_level": next_count})
 ```
 
 ## MLX deployment notes
