@@ -74,6 +74,27 @@ pytest --cov=talos --cov-report=term-missing --cov-report=xml
 talos score --wip-total 10 --global-max 10 --at-cap alpha --backlog-delta 0 --cycles-at-current-level 2
 ```
 
+## API usage
+
+```python
+from talos import compute_talos_level, load_cycles, save_cycles
+
+state = load_cycles()
+
+level = compute_talos_level(
+    wip_total=8,
+    global_max=10,
+    at_cap_projects=["alpha"],
+    backlog_delta=2,
+    cycles_at_current_level=state["count"],
+)
+
+next_count = state["count"] + 1 if level == state["level"] else 1
+save_cycles(level=level, count=next_count, last_backlog=12)
+
+print({"talos_level": level, "cycles_at_level": next_count})
+```
+
 ## MLX deployment notes
 
 A Talos process observed on the maintainer's machine is running as a Python service that watches MLX-related logs and writes JSONL summaries.
