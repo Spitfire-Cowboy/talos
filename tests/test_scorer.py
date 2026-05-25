@@ -1,4 +1,5 @@
 from talos import compute_talos_level
+from talos.models import TalosPolicy
 
 
 def test_returns_clean_when_global_cap_is_invalid() -> None:
@@ -7,6 +8,14 @@ def test_returns_clean_when_global_cap_is_invalid() -> None:
 
 def test_returns_clean_when_below_thresholds() -> None:
     assert compute_talos_level(3, 10, [], 0, 0) == 0
+
+
+def test_policy_can_raise_friction_threshold() -> None:
+    assert compute_talos_level(8, 10, [], 0, 0, policy=TalosPolicy(friction_ratio=0.9, write_block_cycles=2)) == 0
+
+
+def test_policy_can_raise_write_block_threshold() -> None:
+    assert compute_talos_level(10, 10, [], 0, 2, policy=TalosPolicy(write_block_cycles=3)) == 2
 
 
 def test_returns_friction_when_backlog_grows() -> None:
