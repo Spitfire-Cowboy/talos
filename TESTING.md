@@ -11,6 +11,25 @@ python -m pip install -e .[dev]
 pytest --cov=talos --cov-report=term-missing --cov-report=xml
 ```
 
+You can also smoke-test the CLI against a snapshot:
+
+```bash
+cat > snapshot.json <<'JSON'
+{
+  "wip_total": 8,
+  "global_max": 10,
+  "at_cap_projects": ["alpha"],
+  "backlog_total": 12,
+  "backlog_delta": 1,
+  "source": "manual"
+}
+JSON
+
+talos evaluate --snapshot snapshot.json
+talos status
+talos explain --snapshot snapshot.json
+```
+
 ## Linux verification
 
 The current Talos Python core has also been verified in a fresh `python:3.12-slim` Linux container.

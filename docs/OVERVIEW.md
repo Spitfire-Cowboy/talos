@@ -2,7 +2,7 @@
 
 ## Available documents
 
-- `README.md` — top-level project overview, platform note, quick start, CLI usage, and API example
+- `README.md` — top-level project overview, platform note, quick start, runtime CLI usage, and API example
 - `RUNNING_WITH_MLX.md` — verified notes about the observed MLX-oriented deployment shape
 - `TESTING.md` — local test, CI, Codecov, and CodeRabbit setup notes
 - `CONTRIBUTING.md` — contribution guidance for the current repository contents
@@ -10,7 +10,7 @@
 
 ## Current scope
 
-This repository currently publishes the Talos Python scoring core, a small CLI, tests, and repository documentation.
+This repository currently publishes the Talos Python scoring core, snapshot/runtime helpers, a small CLI, tests, and repository documentation.
 
 ## Platform note
 
