@@ -74,35 +74,59 @@ pytest --cov=talos --cov-report=term-missing --cov-report=xml
 talos score --wip-total 10 --global-max 10 --at-cap alpha --backlog-delta 0 --cycles-at-current-level 2
 ```
 
+```bash
+cat > snapshot.json <<'JSON'
+{
+  "wip_total": 8,
+  "global_max": 10,
+  "at_cap_projects": ["alpha"],
+  "backlog_total": 12,
+  "backlog_delta": 1,
+  "source": "manual"
+}
+JSON
+
+talos evaluate --snapshot snapshot.json
+talos status
+talos explain --snapshot snapshot.json
+```
+
 ## API usage
 
 ```python
-from talos import compute_talos_level, load_cycles, save_cycles
+from talos import TalosSnapshot, evaluate_snapshot, load_state
 
-state = load_cycles()
-
-level = compute_talos_level(
-    wip_total=8,
-    global_max=10,
-    at_cap_projects=["alpha"],
-    backlog_delta=2,
-    cycles_at_current_level=state["count"],
+evaluation = evaluate_snapshot(
+    TalosSnapshot(
+        wip_total=8,
+        global_max=10,
+        at_cap_projects=["alpha"],
+        backlog_total=12,
+        backlog_delta=1,
+        source="manual",
+    ),
+    prior_state=load_state(),
 )
 
-next_count = state["count"] + 1 if level == state["level"] else 1
-save_cycles(level=level, count=next_count, last_backlog=12)
-
-print({"talos_level": level, "cycles_at_level": next_count})
+print(evaluation.to_dict())
 ```
 
 ## Persistence
 
-By default, Talos stores cycle state at `~/.config/talos/cycles.json`.
+By default, Talos stores state under `~/.config/talos/`:
 
-To override that location, set `TALOS_CYCLES_FILE` before running Talos:
+- `cycles.json` for the cross-cycle state
+- `status.json` for the latest structured evaluation
+- `history.jsonl` for append-only evaluation history
+- `policy.json` for optional policy overrides
+
+To override those locations, set the corresponding environment variables before running Talos:
 
 ```bash
 export TALOS_CYCLES_FILE=/path/to/talos-cycles.json
+export TALOS_STATUS_FILE=/path/to/talos-status.json
+export TALOS_HISTORY_FILE=/path/to/talos-history.jsonl
+export TALOS_POLICY_FILE=/path/to/talos-policy.json
 ```
 
 ## MLX deployment notes
