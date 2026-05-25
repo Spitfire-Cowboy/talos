@@ -39,13 +39,19 @@ class TalosSnapshot:
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "TalosSnapshot":
+        at_cap_projects = payload.get("at_cap_projects", [])
+        if not isinstance(at_cap_projects, list):
+            raise TypeError(f"at_cap_projects must be a list, got {type(at_cap_projects)}")
+        projects = payload.get("projects", [])
+        if not isinstance(projects, list):
+            raise TypeError(f"projects must be a list, got {type(projects)}")
         return cls(
             wip_total=int(payload["wip_total"]),
             global_max=int(payload["global_max"]),
-            at_cap_projects=list(payload.get("at_cap_projects", [])),
+            at_cap_projects=at_cap_projects.copy(),
             backlog_total=int(payload.get("backlog_total", 0)),
             backlog_delta=int(payload.get("backlog_delta", 0)),
-            projects=list(payload.get("projects", [])),
+            projects=projects.copy(),
             source=str(payload.get("source", "manual")),
             timestamp=str(payload.get("timestamp", "")),
         )
