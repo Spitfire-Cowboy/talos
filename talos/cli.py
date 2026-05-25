@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from .runtime import (
+    TALOS_CYCLES_FILE,
+    TALOS_HISTORY_FILE,
     TALOS_STATUS_FILE,
     append_history,
     evaluate_snapshot,
@@ -19,6 +22,8 @@ from .runtime import (
     save_status,
 )
 from .scorer import compute_talos_level
+
+logger = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,11 +75,22 @@ def main() -> int:
         save_state(level=next_state.level, count=next_state.count, last_backlog=next_state.last_backlog)
         save_status(evaluation)
         append_history(evaluation)
+        persistence_failed = not (
+            TALOS_CYCLES_FILE.exists() and TALOS_STATUS_FILE.exists() and TALOS_HISTORY_FILE.exists()
+        )
         _print_json(evaluation.to_dict())
+        if persistence_failed:
+            logger.error("Talos evaluation completed but one or more persistence writes failed")
+            return 1
         return 0
 
     if args.command == "status":
-        _print_json(json.loads(args.status_file.read_text()))
+        try:
+            _print_json(json.loads(args.status_file.read_text()))
+        except FileNotFoundError:
+            parser.error(f"status file not found: {args.status_file}")
+        except json.JSONDecodeError:
+            parser.error(f"status file is not valid JSON: {args.status_file}")
         return 0
 
     if args.command == "explain":
