@@ -24,6 +24,19 @@ _PROJECT_IDENTITY_FIELDS = ("name", "source", "service", "component", "mode", "q
 _PROJECT_LANE_FIELDS = ("lane", "category", "domain", "kind", "type", "workstream")
 _BLD_ALLOWED_LANES = {"operations", "ops", "inference"}
 _BLD_STALE_LANES = {"behavior", "behavioral", "agent", "bootstrap"}
+_ORCHESTRATION_BOOLEAN_FIELDS = (
+    "subagent_requested",
+    "subagents_requested",
+    "main_thread_did_worker_work",
+)
+_ORCHESTRATION_COUNTER_FIELDS = (
+    "subagents_spawned",
+    "delegated_workers",
+    "coordination_actions",
+    "main_thread_coordination_actions",
+    "implementation_actions",
+    "main_thread_worker_actions",
+)
 
 
 def _normalized_label(value: Any) -> str:
@@ -70,6 +83,16 @@ def _validate_project_contract(project: Dict[str, Any], index: int) -> None:
     raise ValueError(f"projects[{index}] must classify BLD as operations or inference")
 
 
+def _validate_orchestration_contract(orchestration: Dict[str, Any]) -> None:
+    for field_name in _ORCHESTRATION_BOOLEAN_FIELDS:
+        if field_name in orchestration and not isinstance(orchestration[field_name], bool):
+            raise TypeError(f"orchestration.{field_name} must be a boolean")
+    for field_name in _ORCHESTRATION_COUNTER_FIELDS:
+        value = orchestration.get(field_name)
+        if field_name in orchestration and (isinstance(value, bool) or not isinstance(value, (int, float))):
+            raise TypeError(f"orchestration.{field_name} must be a number, not a boolean")
+
+
 @dataclass
 class TalosPolicy:
     """Configurable policy knobs for deterministic Talos scoring."""
@@ -79,9 +102,10 @@ class TalosPolicy:
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "TalosPolicy":
+        defaults = cls()
         return cls(
-            friction_ratio=float(payload.get("friction_ratio", 0.8)),
-            write_block_cycles=int(payload.get("write_block_cycles", 2)),
+            friction_ratio=float(payload.get("friction_ratio", defaults.friction_ratio)),
+            write_block_cycles=int(payload.get("write_block_cycles", defaults.write_block_cycles)),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -98,6 +122,7 @@ class TalosSnapshot:
     backlog_total: int = 0
     backlog_delta: int = 0
     projects: List[Dict[str, Any]] = field(default_factory=list)
+    orchestration: Dict[str, Any] = field(default_factory=dict)
     source: str = "manual"
     timestamp: str = ""
 
@@ -117,6 +142,10 @@ class TalosSnapshot:
             if not isinstance(project, dict):
                 raise TypeError(f"projects[{index}] must be a dict, got {type(project)}")
             _validate_project_contract(project, index)
+        orchestration = payload.get("orchestration", {})
+        if not isinstance(orchestration, dict):
+            raise TypeError(f"orchestration must be a dict, got {type(orchestration)}")
+        _validate_orchestration_contract(orchestration)
         return cls(
             wip_total=int(payload["wip_total"]),
             global_max=int(payload["global_max"]),
@@ -125,6 +154,7 @@ class TalosSnapshot:
             backlog_delta=int(payload.get("backlog_delta", 0)),
             projects=projects.copy(),
             source=source,
+            orchestration=orchestration.copy(),
             timestamp=str(payload.get("timestamp", "")),
         )
 
@@ -167,9 +197,28 @@ class TalosEvaluation:
     backlog_delta: int
     at_cap_projects: List[str]
     reasons: List[str]
+    guardrails: List[str] = field(default_factory=list)
     source: str = "manual"
     timestamp: str = ""
     global_pressure_count: int = 0
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "TalosEvaluation":
+        return cls(
+            level=int(payload["level"]),
+            previous_level=int(payload["previous_level"]),
+            cycles_at_level=int(payload["cycles_at_level"]),
+            wip_total=int(payload["wip_total"]),
+            global_max=int(payload["global_max"]),
+            backlog_total=int(payload["backlog_total"]),
+            backlog_delta=int(payload["backlog_delta"]),
+            at_cap_projects=list(payload["at_cap_projects"]),
+            reasons=list(payload["reasons"]),
+            guardrails=list(payload.get("guardrails", [])),
+            source=str(payload.get("source", "manual")),
+            timestamp=str(payload.get("timestamp", "")),
+            global_pressure_count=int(payload.get("global_pressure_count", 0)),
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

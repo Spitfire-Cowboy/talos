@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from .runtime import (
-    TALOS_CYCLES_FILE,
-    TALOS_HISTORY_FILE,
     TALOS_STATUS_FILE,
     append_history,
     evaluate_snapshot,
@@ -43,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser = subparsers.add_parser("status", help="show the last persisted Talos status")
     status_parser.add_argument("--status-file", type=Path, default=TALOS_STATUS_FILE)
 
-    explain_parser = subparsers.add_parser("explain", help="show human-readable reasons for a snapshot")
+    explain_parser = subparsers.add_parser("explain", help="show human-readable reasons and guardrails for a snapshot")
     explain_parser.add_argument("--snapshot", type=Path, required=True)
 
     return parser
@@ -71,23 +69,22 @@ def main() -> int:
     if args.command == "evaluate":
         try:
             snapshot = read_snapshot(args.snapshot)
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             parser.error(f"snapshot is not valid Talos input: {exc}")
         evaluation = evaluate_snapshot(snapshot, prior_state=load_state(), policy=load_policy())
         next_state = next_state_from_evaluation(evaluation)
-        save_state(
-            level=next_state.level,
-            count=next_state.count,
-            last_backlog=next_state.last_backlog,
-            global_pressure_count=next_state.global_pressure_count,
-        )
-        save_status(evaluation)
-        append_history(evaluation)
-        persistence_failed = not (
-            TALOS_CYCLES_FILE.exists() and TALOS_STATUS_FILE.exists() and TALOS_HISTORY_FILE.exists()
+        persistence_results = (
+            save_state(
+                level=next_state.level,
+                count=next_state.count,
+                last_backlog=next_state.last_backlog,
+                global_pressure_count=next_state.global_pressure_count,
+            ),
+            save_status(evaluation),
+            append_history(evaluation),
         )
         _print_json(evaluation.to_dict())
-        if persistence_failed:
+        if not all(persistence_results):
             logger.error("Talos evaluation completed but one or more persistence writes failed")
             return 1
         return 0
@@ -104,7 +101,7 @@ def main() -> int:
     if args.command == "explain":
         try:
             snapshot = read_snapshot(args.snapshot)
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             parser.error(f"snapshot is not valid Talos input: {exc}")
         evaluation = evaluate_snapshot(snapshot, prior_state=load_state(), policy=load_policy())
         for reason in evaluation.reasons:
