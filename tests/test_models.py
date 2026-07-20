@@ -1,3 +1,5 @@
+import pytest
+
 from talos.models import TalosEvaluation, TalosPolicy, TalosSnapshot, TalosState
 
 
@@ -22,19 +24,50 @@ def test_snapshot_round_trip() -> None:
 
 
 def test_snapshot_rejects_non_list_fields() -> None:
-    try:
+    with pytest.raises(TypeError, match="at_cap_projects must be a list"):
         TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "at_cap_projects": "alpha"})
-    except TypeError as exc:
-        assert "at_cap_projects must be a list" in str(exc)
-    else:  # pragma: no cover
-        raise AssertionError("expected TypeError for invalid at_cap_projects")
 
-    try:
+    with pytest.raises(TypeError, match="projects must be a list"):
         TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "projects": "alpha"})
-    except TypeError as exc:
-        assert "projects must be a list" in str(exc)
-    else:  # pragma: no cover
-        raise AssertionError("expected TypeError for invalid projects")
+
+    with pytest.raises(TypeError, match=r"projects\[0\] must be a dict"):
+        TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "projects": ["alpha"]})
+
+
+@pytest.mark.parametrize("source", ["Weekend Mode", "WeekendMode", "redis queue-v2", "redis_queue_v2", "Perpetua", "Campion"])
+def test_snapshot_rejects_deprecated_enforcement_sources(source: str) -> None:
+    with pytest.raises(ValueError, match="deprecated enforcement surface"):
+        TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "source": source})
+
+
+def test_snapshot_rejects_deprecated_project_references() -> None:
+    with pytest.raises(ValueError, match=r"at_cap_projects\[0\] references deprecated enforcement surface"):
+        TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "at_cap_projects": ["campion"]})
+
+    with pytest.raises(ValueError, match=r"projects\[0\].queue references deprecated enforcement surface"):
+        TalosSnapshot.from_dict(
+            {"wip_total": 8, "global_max": 10, "projects": [{"name": "worker", "queue": "queue-v2"}]}
+        )
+
+
+def test_snapshot_classifies_bld_as_operations_or_inference() -> None:
+    operations_payload = {
+        "wip_total": 8,
+        "global_max": 10,
+        "projects": [{"name": "BLD", "lane": "operations"}, {"name": "BLD", "lane": "inference"}],
+    }
+    assert TalosSnapshot.from_dict(operations_payload).projects == operations_payload["projects"]
+
+    with pytest.raises(ValueError, match="must classify BLD as operations or inference"):
+        TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "projects": [{"name": "BLD", "lane": "behavior"}]})
+
+    with pytest.raises(ValueError, match="must classify BLD as operations or inference"):
+        TalosSnapshot.from_dict(
+            {"wip_total": 8, "global_max": 10, "projects": [{"name": "BLD", "lane": "ops", "category": "behavior"}]}
+        )
+
+    with pytest.raises(ValueError, match="must classify BLD as operations or inference"):
+        TalosSnapshot.from_dict({"wip_total": 8, "global_max": 10, "projects": [{"name": "BLD"}]})
 
 
 def test_state_round_trip() -> None:
