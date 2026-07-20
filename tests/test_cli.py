@@ -73,12 +73,32 @@ def test_evaluate_returns_nonzero_when_persistence_outputs_are_missing(tmp_path:
     assert "persistence writes failed" in caplog.text
 
 
+def test_evaluate_command_errors_when_snapshot_uses_deprecated_source(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps({"wip_total": 8, "global_max": 10, "source": "WeekendMode"}))
+    monkeypatch.setattr("sys.argv", ["talos", "evaluate", "--snapshot", str(snapshot_path)])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert "snapshot is not valid Talos input" in capsys.readouterr().err
+
+
 def test_explain_command_outputs_reasons(tmp_path: Path, capsys, monkeypatch) -> None:
     snapshot_path = tmp_path / "snapshot.json"
     snapshot_path.write_text(json.dumps({"wip_total": 10, "global_max": 10, "backlog_total": 5, "backlog_delta": 0}))
     monkeypatch.setattr("sys.argv", ["talos", "explain", "--snapshot", str(snapshot_path)])
     assert cli.main() == 0
     assert "wip_total reached or exceeded global_max" in capsys.readouterr().out
+
+
+def test_explain_command_errors_when_snapshot_uses_deprecated_source(tmp_path: Path, capsys, monkeypatch) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps({"wip_total": 8, "global_max": 10, "source": "WeekendMode"}))
+    monkeypatch.setattr("sys.argv", ["talos", "explain", "--snapshot", str(snapshot_path)])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert "snapshot is not valid Talos input" in capsys.readouterr().err
 
 
 def test_status_command_errors_when_file_is_missing(tmp_path: Path, monkeypatch) -> None:

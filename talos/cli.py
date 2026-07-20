@@ -69,7 +69,10 @@ def main() -> int:
         return 0
 
     if args.command == "evaluate":
-        snapshot = read_snapshot(args.snapshot)
+        try:
+            snapshot = read_snapshot(args.snapshot)
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            parser.error(f"snapshot is not valid Talos input: {exc}")
         evaluation = evaluate_snapshot(snapshot, prior_state=load_state(), policy=load_policy())
         next_state = next_state_from_evaluation(evaluation)
         save_state(level=next_state.level, count=next_state.count, last_backlog=next_state.last_backlog)
@@ -94,7 +97,10 @@ def main() -> int:
         return 0
 
     if args.command == "explain":
-        snapshot = read_snapshot(args.snapshot)
+        try:
+            snapshot = read_snapshot(args.snapshot)
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            parser.error(f"snapshot is not valid Talos input: {exc}")
         evaluation = evaluate_snapshot(snapshot, prior_state=load_state(), policy=load_policy())
         for reason in evaluation.reasons:
             print(f"- {reason}")

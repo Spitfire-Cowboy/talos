@@ -6,6 +6,70 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List
 
 
+_DEPRECATED_ENFORCEMENT_TERMS = (
+    "weekend-mode",
+    "weekend mode",
+    "weekendmode",
+    "redis queue-v2",
+    "redis queue v2",
+    "redis-queue-v2",
+    "redisqueuev2",
+    "queue-v2",
+    "queue v2",
+    "queuev2",
+    "perpetua",
+    "campion",
+)
+_PROJECT_IDENTITY_FIELDS = ("name", "source", "service", "component", "mode", "queue", "agent", "bootstrap")
+_PROJECT_LANE_FIELDS = ("lane", "category", "domain", "kind", "type", "workstream")
+_BLD_ALLOWED_LANES = {"operations", "ops", "inference"}
+_BLD_STALE_LANES = {"behavior", "behavioral", "agent", "bootstrap"}
+
+
+def _normalized_label(value: Any) -> str:
+    return str(value).strip().lower().replace("_", "-")
+
+
+def _deprecated_term(value: Any) -> str:
+    label = _normalized_label(value)
+    for term in _DEPRECATED_ENFORCEMENT_TERMS:
+        if term in label:
+            return term
+    return ""
+
+
+def _reject_deprecated_term(value: Any, field_name: str) -> None:
+    term = _deprecated_term(value)
+    if term:
+        raise ValueError(f"{field_name} references deprecated enforcement surface: {term}")
+
+
+def _validate_project_contract(project: Dict[str, Any], index: int) -> None:
+    for field_name in _PROJECT_IDENTITY_FIELDS:
+        if field_name in project:
+            _reject_deprecated_term(project[field_name], f"projects[{index}].{field_name}")
+
+    bld_identity = any(
+        _normalized_label(project[field_name]) == "bld"
+        for field_name in _PROJECT_IDENTITY_FIELDS
+        if field_name in project
+    )
+    if not bld_identity:
+        return
+
+    has_lane = False
+    for field_name in _PROJECT_LANE_FIELDS:
+        if field_name not in project:
+            continue
+        has_lane = True
+        lane = _normalized_label(project[field_name])
+        if lane in _BLD_STALE_LANES or lane not in _BLD_ALLOWED_LANES:
+            raise ValueError(f"projects[{index}].{field_name} must classify BLD as operations or inference")
+    if has_lane:
+        return
+    raise ValueError(f"projects[{index}] must classify BLD as operations or inference")
+
+
 @dataclass
 class TalosPolicy:
     """Configurable policy knobs for deterministic Talos scoring."""
@@ -45,6 +109,14 @@ class TalosSnapshot:
         projects = payload.get("projects", [])
         if not isinstance(projects, list):
             raise TypeError(f"projects must be a list, got {type(projects)}")
+        source = str(payload.get("source", "manual"))
+        _reject_deprecated_term(source, "source")
+        for index, project_name in enumerate(at_cap_projects):
+            _reject_deprecated_term(project_name, f"at_cap_projects[{index}]")
+        for index, project in enumerate(projects):
+            if not isinstance(project, dict):
+                raise TypeError(f"projects[{index}] must be a dict, got {type(project)}")
+            _validate_project_contract(project, index)
         return cls(
             wip_total=int(payload["wip_total"]),
             global_max=int(payload["global_max"]),
@@ -52,7 +124,7 @@ class TalosSnapshot:
             backlog_total=int(payload.get("backlog_total", 0)),
             backlog_delta=int(payload.get("backlog_delta", 0)),
             projects=projects.copy(),
-            source=str(payload.get("source", "manual")),
+            source=source,
             timestamp=str(payload.get("timestamp", "")),
         )
 
