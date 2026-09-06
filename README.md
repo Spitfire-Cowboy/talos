@@ -129,6 +129,10 @@ export TALOS_HISTORY_FILE=/path/to/talos-history.jsonl
 export TALOS_POLICY_FILE=/path/to/talos-policy.json
 ```
 
+State and status writes use atomic file replacement from a unique temporary file in the destination directory. This
+prevents partial file publication and staging-file collisions between concurrent writers. It does not serialize the
+whole load/evaluate/save transaction, so callers that require transaction-level ordering must provide that coordination.
+
 ## MLX deployment notes
 
 A Talos process observed on the maintainer's machine is running as a Python service that watches MLX-related logs and writes JSONL summaries.
