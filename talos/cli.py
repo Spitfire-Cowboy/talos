@@ -75,7 +75,12 @@ def main() -> int:
             parser.error(f"snapshot is not valid Talos input: {exc}")
         evaluation = evaluate_snapshot(snapshot, prior_state=load_state(), policy=load_policy())
         next_state = next_state_from_evaluation(evaluation)
-        save_state(level=next_state.level, count=next_state.count, last_backlog=next_state.last_backlog)
+        save_state(
+            level=next_state.level,
+            count=next_state.count,
+            last_backlog=next_state.last_backlog,
+            global_pressure_count=next_state.global_pressure_count,
+        )
         save_status(evaluation)
         append_history(evaluation)
         persistence_failed = not (

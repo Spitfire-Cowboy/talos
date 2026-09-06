@@ -71,8 +71,13 @@ def test_snapshot_classifies_bld_as_operations_or_inference() -> None:
 
 
 def test_state_round_trip() -> None:
+    state = TalosState.from_dict({"level": 2, "count": 3, "last_backlog": 7, "global_pressure_count": 2})
+    assert state.to_dict() == {"level": 2, "count": 3, "last_backlog": 7, "global_pressure_count": 2}
+
+
+def test_state_from_legacy_payload_defaults_global_pressure_count() -> None:
     state = TalosState.from_dict({"level": 2, "count": 3, "last_backlog": 7})
-    assert state.to_dict() == {"level": 2, "count": 3, "last_backlog": 7}
+    assert state.global_pressure_count == 0
 
 
 def test_evaluation_to_dict() -> None:
@@ -99,4 +104,5 @@ def test_evaluation_to_dict() -> None:
         "reasons": ["backlog is growing"],
         "source": "manual",
         "timestamp": "",
+        "global_pressure_count": 0,
     }

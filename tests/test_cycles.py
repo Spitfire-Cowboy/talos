@@ -16,21 +16,21 @@ def test_default_cycles_file_honors_environment_override(monkeypatch) -> None:
 
 def test_load_cycles_returns_defaults_when_file_is_missing(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(runtime, "TALOS_CYCLES_FILE", tmp_path / "missing.json")
-    assert runtime.load_cycles() == {"level": 0, "count": 0, "last_backlog": 0}
+    assert runtime.load_cycles() == {"level": 0, "count": 0, "last_backlog": 0, "global_pressure_count": 0}
 
 
 def test_load_cycles_returns_defaults_when_file_is_corrupt(tmp_path: Path, monkeypatch) -> None:
     target = tmp_path / "cycles.json"
     target.write_text("not-json")
     monkeypatch.setattr(runtime, "TALOS_CYCLES_FILE", target)
-    assert runtime.load_cycles() == {"level": 0, "count": 0, "last_backlog": 0}
+    assert runtime.load_cycles() == {"level": 0, "count": 0, "last_backlog": 0, "global_pressure_count": 0}
 
 
 def test_save_cycles_and_load_cycles_round_trip(tmp_path: Path, monkeypatch) -> None:
     target = tmp_path / "cycles.json"
     monkeypatch.setattr(runtime, "TALOS_CYCLES_FILE", target)
-    runtime.save_cycles(level=2, count=4, last_backlog=11)
-    assert runtime.load_cycles() == {"level": 2, "count": 4, "last_backlog": 11}
+    runtime.save_cycles(level=2, count=4, last_backlog=11, global_pressure_count=3)
+    assert runtime.load_cycles() == {"level": 2, "count": 4, "last_backlog": 11, "global_pressure_count": 3}
 
 
 def test_save_cycles_logs_failures(monkeypatch, caplog) -> None:
@@ -59,4 +59,4 @@ def test_save_cycles_writes_atomically(tmp_path: Path, monkeypatch) -> None:
     runtime.save_cycles(level=7, count=8, last_backlog=9)
     assert target.exists()
     assert sorted(tmp_path.iterdir()) == [target]
-    assert runtime.load_cycles() == {"level": 7, "count": 8, "last_backlog": 9}
+    assert runtime.load_cycles() == {"level": 7, "count": 8, "last_backlog": 9, "global_pressure_count": 0}

@@ -27,17 +27,108 @@ def test_evaluate_snapshot_builds_structured_output() -> None:
         source="test",
         timestamp="2026-05-25T12:00:00Z",
     )
-    evaluation = evaluate_snapshot(snapshot, prior_state=TalosState(level=2, count=2), policy=TalosPolicy())
+    evaluation = evaluate_snapshot(
+        snapshot,
+        prior_state=TalosState(level=2, count=2, global_pressure_count=2),
+        policy=TalosPolicy(),
+    )
     assert evaluation.level == 3
     assert evaluation.cycles_at_level == 3
+    assert evaluation.global_pressure_count == 3
     assert evaluation.source == "test"
     assert "global cap pressure persisted long enough to block writes" in evaluation.reasons
 
 
 def test_state_round_trip(tmp_path: Path) -> None:
     target = tmp_path / "cycles.json"
-    save_state(level=2, count=4, last_backlog=11, path=target)
-    assert load_state(path=target).to_dict() == {"level": 2, "count": 4, "last_backlog": 11}
+    save_state(level=2, count=4, last_backlog=11, path=target, global_pressure_count=3)
+    assert load_state(path=target).to_dict() == {
+        "level": 2,
+        "count": 4,
+        "last_backlog": 11,
+        "global_pressure_count": 3,
+    }
+
+
+def test_load_state_defaults_global_pressure_count_for_legacy_file(tmp_path: Path) -> None:
+    target = tmp_path / "cycles.json"
+    target.write_text('{"level": 2, "count": 4, "last_backlog": 11}')
+    assert load_state(path=target).to_dict() == {
+        "level": 2,
+        "count": 4,
+        "last_backlog": 11,
+        "global_pressure_count": 0,
+    }
+
+
+def test_project_cap_history_does_not_escalate_first_global_pressure_cycle() -> None:
+    state = TalosState()
+    levels = []
+    global_pressure_counts = []
+    for wip_total in (5, 5, 10):
+        evaluation = evaluate_snapshot(
+            TalosSnapshot(wip_total=wip_total, global_max=10, at_cap_projects=["alpha"]),
+            prior_state=state,
+        )
+        levels.append(evaluation.level)
+        global_pressure_counts.append(evaluation.global_pressure_count)
+        state = next_state_from_evaluation(evaluation)
+
+    assert levels == [2, 2, 2]
+    assert global_pressure_counts == [0, 0, 1]
+    assert state.count == 3
+
+
+def test_repeated_global_pressure_escalates_at_configured_threshold() -> None:
+    state = TalosState()
+    levels = []
+    for _ in range(3):
+        evaluation = evaluate_snapshot(
+            TalosSnapshot(wip_total=10, global_max=10),
+            prior_state=state,
+            policy=TalosPolicy(write_block_cycles=2),
+        )
+        levels.append(evaluation.level)
+        state = next_state_from_evaluation(evaluation)
+
+    assert levels == [2, 2, 3]
+    assert state.global_pressure_count == 3
+
+
+def test_below_global_cap_resets_streak_when_project_remains_capped() -> None:
+    state = TalosState(level=2, count=2, global_pressure_count=2)
+    below_cap = evaluate_snapshot(
+        TalosSnapshot(wip_total=5, global_max=10, at_cap_projects=["alpha"]),
+        prior_state=state,
+    )
+    assert below_cap.level == 2
+    assert below_cap.global_pressure_count == 0
+
+    next_global = evaluate_snapshot(
+        TalosSnapshot(wip_total=10, global_max=10, at_cap_projects=["alpha"]),
+        prior_state=next_state_from_evaluation(below_cap),
+    )
+    assert next_global.level == 2
+    assert next_global.global_pressure_count == 1
+
+
+def test_level_three_persists_for_legacy_state_under_global_pressure() -> None:
+    legacy_state = TalosState.from_dict({"level": 3, "count": 4, "last_backlog": 7})
+    evaluation = evaluate_snapshot(
+        TalosSnapshot(wip_total=10, global_max=10),
+        prior_state=legacy_state,
+    )
+    assert evaluation.level == 3
+    assert evaluation.global_pressure_count == 1
+
+
+def test_zero_cap_stays_clean_and_resets_global_pressure_streak() -> None:
+    evaluation = evaluate_snapshot(
+        TalosSnapshot(wip_total=10, global_max=0, at_cap_projects=["alpha"]),
+        prior_state=TalosState(level=3, count=4, global_pressure_count=3),
+    )
+    assert evaluation.level == 0
+    assert evaluation.global_pressure_count == 0
 
 
 def test_atomic_write_uses_unique_staging_files_for_concurrent_calls(tmp_path: Path, monkeypatch) -> None:
@@ -131,6 +222,7 @@ def test_next_state_matches_evaluation() -> None:
     state = next_state_from_evaluation(evaluation)
     assert state.level == evaluation.level
     assert state.count == evaluation.cycles_at_level
+    assert state.global_pressure_count == evaluation.global_pressure_count
 
 
 def test_load_policy_reads_json(tmp_path: Path) -> None:
