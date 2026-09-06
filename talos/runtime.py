@@ -59,12 +59,26 @@ def load_state(path: Optional[Path] = None) -> TalosState:
         return TalosState()
 
 
-def save_state(level: int, count: int, last_backlog: int, path: Optional[Path] = None) -> None:
+def save_state(
+    level: int,
+    count: int,
+    last_backlog: int,
+    path: Optional[Path] = None,
+    global_pressure_count: int = 0,
+) -> None:
     target = path or TALOS_CYCLES_FILE
     try:
         _atomic_write_text(
             target,
-            json.dumps({"level": level, "count": count, "last_backlog": last_backlog}, sort_keys=True),
+            json.dumps(
+                TalosState(
+                    level=level,
+                    count=count,
+                    last_backlog=last_backlog,
+                    global_pressure_count=global_pressure_count,
+                ).to_dict(),
+                sort_keys=True,
+            ),
         )
     except Exception:
         logger.warning("Failed to persist Talos state to %s", target, exc_info=True)
@@ -128,9 +142,10 @@ def evaluate_snapshot(
 ) -> TalosEvaluation:
     active_state = prior_state or TalosState()
     active_policy = policy or TalosPolicy()
-    persisted_pressure_cycles = (
-        active_state.count if active_state.level >= 2 and snapshot.wip_total >= snapshot.global_max else 0
-    )
+    global_pressure = snapshot.global_max > 0 and snapshot.wip_total >= snapshot.global_max
+    persisted_pressure_cycles = active_state.global_pressure_count if global_pressure else 0
+    if global_pressure and active_state.level == 3:
+        persisted_pressure_cycles = max(persisted_pressure_cycles, active_policy.write_block_cycles)
     level = compute_talos_level(
         wip_total=snapshot.wip_total,
         global_max=snapshot.global_max,
@@ -139,8 +154,9 @@ def evaluate_snapshot(
         cycles_at_current_level=persisted_pressure_cycles,
         policy=active_policy,
     )
-    pressure_streak_continues = active_state.level >= 2 and level >= 2 and snapshot.wip_total >= snapshot.global_max
+    pressure_streak_continues = active_state.level >= 2 and level >= 2 and global_pressure
     cycles_at_level = active_state.count + 1 if level == active_state.level or pressure_streak_continues else 1
+    global_pressure_count = active_state.global_pressure_count + 1 if global_pressure else 0
     return TalosEvaluation(
         level=level,
         previous_level=active_state.level,
@@ -153,11 +169,17 @@ def evaluate_snapshot(
         reasons=explain_level(snapshot=snapshot, level=level, policy=active_policy),
         source=snapshot.source,
         timestamp=snapshot.timestamp,
+        global_pressure_count=global_pressure_count,
     )
 
 
 def next_state_from_evaluation(evaluation: TalosEvaluation) -> TalosState:
-    return TalosState(level=evaluation.level, count=evaluation.cycles_at_level, last_backlog=evaluation.backlog_total)
+    return TalosState(
+        level=evaluation.level,
+        count=evaluation.cycles_at_level,
+        last_backlog=evaluation.backlog_total,
+        global_pressure_count=evaluation.global_pressure_count,
+    )
 
 
 def load_cycles() -> dict:
@@ -165,6 +187,11 @@ def load_cycles() -> dict:
     return load_state().to_dict()
 
 
-def save_cycles(level: int, count: int, last_backlog: int) -> None:
+def save_cycles(level: int, count: int, last_backlog: int, global_pressure_count: int = 0) -> None:
     """Backward-compatible wrapper for saving persisted Talos cycle state."""
-    save_state(level=level, count=count, last_backlog=last_backlog)
+    save_state(
+        level=level,
+        count=count,
+        last_backlog=last_backlog,
+        global_pressure_count=global_pressure_count,
+    )

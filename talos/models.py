@@ -139,6 +139,7 @@ class TalosState:
     level: int = 0
     count: int = 0
     last_backlog: int = 0
+    global_pressure_count: int = 0
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "TalosState":
@@ -146,6 +147,7 @@ class TalosState:
             level=int(payload.get("level", 0)),
             count=int(payload.get("count", 0)),
             last_backlog=int(payload.get("last_backlog", 0)),
+            global_pressure_count=int(payload.get("global_pressure_count", 0)),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -167,6 +169,7 @@ class TalosEvaluation:
     reasons: List[str]
     source: str = "manual"
     timestamp: str = ""
+    global_pressure_count: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
