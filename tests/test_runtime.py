@@ -7,6 +7,7 @@ import pytest
 import talos.runtime as runtime
 from talos.models import TalosPolicy, TalosSnapshot, TalosState
 from talos.runtime import (
+    ORCHESTRATION_DRIFT_MESSAGE,
     append_history,
     evaluate_snapshot,
     load_policy,
@@ -39,9 +40,82 @@ def test_evaluate_snapshot_builds_structured_output() -> None:
     assert "global cap pressure persisted long enough to block writes" in evaluation.reasons
 
 
+def test_evaluate_snapshot_flags_orchestration_drift() -> None:
+    snapshot = TalosSnapshot(
+        wip_total=4,
+        global_max=10,
+        backlog_total=1,
+        backlog_delta=0,
+        orchestration={
+            "subagents_requested": True,
+            "main_thread_role": "orchestrator",
+            "coordination_actions": 1,
+            "implementation_actions": 3,
+        },
+    )
+    evaluation = evaluate_snapshot(snapshot, prior_state=TalosState())
+    assert evaluation.guardrails == [ORCHESTRATION_DRIFT_MESSAGE]
+    assert ORCHESTRATION_DRIFT_MESSAGE in evaluation.reasons
+
+
+def test_orchestration_role_without_subagent_handoff_does_not_flag_drift() -> None:
+    snapshot = TalosSnapshot(
+        wip_total=4,
+        global_max=10,
+        orchestration={
+            "intent": "orchestrate",
+            "main_thread_role": "orchestrator",
+            "implementation_actions": 3,
+        },
+    )
+
+    assert evaluate_snapshot(snapshot).guardrails == []
+
+
+@pytest.mark.parametrize("request_field", ["subagent_requested", "subagents_requested"])
+@pytest.mark.parametrize("request_value", ["true", "false"])
+def test_string_request_flags_do_not_create_a_handoff(request_field: str, request_value: str) -> None:
+    snapshot = TalosSnapshot(
+        wip_total=4,
+        global_max=10,
+        orchestration={request_field: request_value, "implementation_actions": 3},
+    )
+
+    assert evaluate_snapshot(snapshot).guardrails == []
+
+
+@pytest.mark.parametrize("counter_value", [True, False])
+def test_boolean_counter_values_are_not_coerced_to_integers(counter_value: bool) -> None:
+    assert runtime._coerce_int(counter_value) == 0
+
+
+def test_boolean_spawned_counter_does_not_create_a_handoff() -> None:
+    snapshot = TalosSnapshot(
+        wip_total=4,
+        global_max=10,
+        orchestration={"subagents_spawned": True, "implementation_actions": 3},
+    )
+
+    assert evaluate_snapshot(snapshot).guardrails == []
+
+
+def test_invalid_orchestration_counts_do_not_create_a_handoff_or_drift() -> None:
+    snapshot = TalosSnapshot(
+        wip_total=4,
+        global_max=10,
+        orchestration={
+            "subagents_spawned": "invalid",
+            "coordination_actions": "invalid",
+            "implementation_actions": "invalid",
+        },
+    )
+
+    assert evaluate_snapshot(snapshot).guardrails == []
+
+
 def test_state_round_trip(tmp_path: Path) -> None:
     target = tmp_path / "cycles.json"
-    save_state(level=2, count=4, last_backlog=11, path=target, global_pressure_count=3)
+    assert save_state(level=2, count=4, last_backlog=11, path=target, global_pressure_count=3)
     assert load_state(path=target).to_dict() == {
         "level": 2,
         "count": 4,
@@ -242,7 +316,7 @@ def test_save_status_writes_structured_json(tmp_path: Path) -> None:
     runtime = __import__("talos.runtime", fromlist=["save_status", "TalosSnapshot", "TalosState", "evaluate_snapshot"])
     target = tmp_path / "status.json"
     evaluation = evaluate_snapshot(TalosSnapshot(wip_total=4, global_max=10), prior_state=TalosState())
-    runtime.save_status(evaluation, path=target)
+    assert runtime.save_status(evaluation, path=target)
     assert json.loads(target.read_text())["level"] == 0
 
 
@@ -254,7 +328,7 @@ def test_save_status_logs_failures(monkeypatch, caplog, tmp_path: Path) -> None:
 
     monkeypatch.setattr("talos.runtime._atomic_write_text", boom)
     with caplog.at_level("WARNING"):
-        save_status(evaluation, path=tmp_path / "status.json")
+        assert not save_status(evaluation, path=tmp_path / "status.json")
     assert "Failed to persist Talos status" in caplog.text
 
 
@@ -272,6 +346,23 @@ def test_explain_level_handles_zero_cap() -> None:
     assert reasons == ["global_max<=0 so Talos stayed at clean level 0"]
 
 
+def test_explain_level_includes_guardrails_when_global_cap_is_zero() -> None:
+    reasons = runtime.explain_level(
+        TalosSnapshot(wip_total=1, global_max=0),
+        level=0,
+        guardrails=[ORCHESTRATION_DRIFT_MESSAGE],
+    )
+    assert reasons == ["global_max<=0 so Talos stayed at clean level 0", ORCHESTRATION_DRIFT_MESSAGE]
+
+
+def test_explain_level_uses_same_fractional_threshold_as_scorer() -> None:
+    snapshot = TalosSnapshot(wip_total=2, global_max=3)
+    evaluation = evaluate_snapshot(snapshot, policy=TalosPolicy(friction_ratio=0.8))
+
+    assert evaluation.level == 0
+    assert evaluation.reasons == ["wip and backlog are within policy thresholds"]
+
+
 def test_append_history_logs_failures(caplog, tmp_path: Path) -> None:
     target = tmp_path / "history.jsonl"
     target.write_text("")
@@ -287,5 +378,5 @@ def test_append_history_logs_failures(caplog, tmp_path: Path) -> None:
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(Path, "open", broken_open)
         with caplog.at_level("WARNING"):
-            append_history(evaluation, path=target)
+            assert not append_history(evaluation, path=target)
     assert "Failed to append Talos history" in caplog.text

@@ -91,6 +91,11 @@ talos status
 talos explain --snapshot snapshot.json
 ```
 
+Snapshots may include an `orchestration` object with subagent-request, spawned-worker, coordination-action, and
+main-thread implementation-action telemetry. Talos reports orchestration drift only after a real subagent request or
+handoff when main-thread implementation actions outnumber coordination actions; role or intent labels alone do not
+trigger the guardrail.
+
 ## API usage
 
 ```python

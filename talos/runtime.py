@@ -15,6 +15,49 @@ from .scorer import compute_talos_level
 logger = logging.getLogger(__name__)
 
 
+ORCHESTRATION_DRIFT_MESSAGE = (
+    "orchestration drift detected: subagents were requested, so the main thread should stay in "
+    "orchestration/control-plane mode and delegate worker implementation"
+)
+
+
+def _coerce_int(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def detect_guardrails(snapshot: TalosSnapshot) -> List[str]:
+    orchestration = snapshot.orchestration
+    if not orchestration:
+        return []
+
+    subagents_requested = (
+        orchestration.get("subagent_requested") is True or orchestration.get("subagents_requested") is True
+    )
+    subagents_spawned = _coerce_int(orchestration.get("subagents_spawned", orchestration.get("delegated_workers", 0)))
+    coordination_actions = _coerce_int(
+        orchestration.get("coordination_actions", orchestration.get("main_thread_coordination_actions", 0))
+    )
+    implementation_actions = _coerce_int(
+        orchestration.get("implementation_actions", orchestration.get("main_thread_worker_actions", 0))
+    )
+    main_thread_did_worker_work = (
+        orchestration.get("main_thread_did_worker_work") is True or implementation_actions > 0
+    )
+
+    handoff_requested = subagents_requested or subagents_spawned > 0
+    drift_detected = (
+        handoff_requested and main_thread_did_worker_work and implementation_actions > coordination_actions
+    )
+    if drift_detected:
+        return [ORCHESTRATION_DRIFT_MESSAGE]
+    return []
+
+
 def _default_data_dir() -> Path:
     return Path.home() / ".config" / "talos"
 
@@ -65,7 +108,7 @@ def save_state(
     last_backlog: int,
     path: Optional[Path] = None,
     global_pressure_count: int = 0,
-) -> None:
+) -> bool:
     target = path or TALOS_CYCLES_FILE
     try:
         _atomic_write_text(
@@ -80,8 +123,10 @@ def save_state(
                 sort_keys=True,
             ),
         )
+        return True
     except Exception:
         logger.warning("Failed to persist Talos state to %s", target, exc_info=True)
+        return False
 
 
 def load_policy(path: Optional[Path] = None) -> TalosPolicy:
@@ -92,39 +137,53 @@ def load_policy(path: Optional[Path] = None) -> TalosPolicy:
         return TalosPolicy()
 
 
-def save_status(evaluation: TalosEvaluation, path: Optional[Path] = None) -> None:
+def save_status(evaluation: TalosEvaluation, path: Optional[Path] = None) -> bool:
     target = path or TALOS_STATUS_FILE
     try:
         _atomic_write_text(target, json.dumps(evaluation.to_dict(), indent=2, sort_keys=True))
+        return True
     except Exception:
         logger.warning("Failed to persist Talos status to %s", target, exc_info=True)
+        return False
 
 
-def append_history(evaluation: TalosEvaluation, path: Optional[Path] = None) -> None:
+def append_history(evaluation: TalosEvaluation, path: Optional[Path] = None) -> bool:
     target = path or TALOS_HISTORY_FILE
     try:
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with target.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(evaluation.to_dict(), sort_keys=True) + "\n")
+        return True
     except Exception:
         logger.warning("Failed to append Talos history to %s", target, exc_info=True)
+        return False
 
 
 def read_snapshot(path: Path) -> TalosSnapshot:
     return TalosSnapshot.from_dict(json.loads(path.read_text()))
 
 
-def explain_level(snapshot: TalosSnapshot, level: int, policy: Optional[TalosPolicy] = None) -> List[str]:
+def explain_level(
+    snapshot: TalosSnapshot,
+    level: int,
+    policy: Optional[TalosPolicy] = None,
+    guardrails: Optional[List[str]] = None,
+) -> List[str]:
     active_policy = policy or TalosPolicy()
     reasons: List[str] = []
-    ratio_threshold = int(snapshot.global_max * active_policy.friction_ratio) if snapshot.global_max > 0 else 0
     if snapshot.global_max <= 0:
-        return ["global_max<=0 so Talos stayed at clean level 0"]
+        reasons.append("global_max<=0 so Talos stayed at clean level 0")
+        if guardrails:
+            reasons.extend(guardrails)
+        return reasons
     if snapshot.wip_total >= snapshot.global_max:
         reasons.append("wip_total reached or exceeded global_max")
     if snapshot.at_cap_projects:
         reasons.append("one or more projects are already at cap")
-    if snapshot.wip_total >= ratio_threshold and snapshot.wip_total < snapshot.global_max:
+    if (
+        snapshot.wip_total >= snapshot.global_max * active_policy.friction_ratio
+        and snapshot.wip_total < snapshot.global_max
+    ):
         reasons.append("wip_total crossed the friction threshold")
     if snapshot.backlog_delta > 0:
         reasons.append("backlog is growing")
@@ -132,6 +191,8 @@ def explain_level(snapshot: TalosSnapshot, level: int, policy: Optional[TalosPol
         reasons.append("wip and backlog are within policy thresholds")
     if level == 3:
         reasons.append("global cap pressure persisted long enough to block writes")
+    if guardrails:
+        reasons.extend(guardrails)
     return reasons
 
 
@@ -157,6 +218,7 @@ def evaluate_snapshot(
     pressure_streak_continues = active_state.level >= 2 and level >= 2 and global_pressure
     cycles_at_level = active_state.count + 1 if level == active_state.level or pressure_streak_continues else 1
     global_pressure_count = active_state.global_pressure_count + 1 if global_pressure else 0
+    guardrails = detect_guardrails(snapshot)
     return TalosEvaluation(
         level=level,
         previous_level=active_state.level,
@@ -166,7 +228,8 @@ def evaluate_snapshot(
         backlog_total=snapshot.backlog_total,
         backlog_delta=snapshot.backlog_delta,
         at_cap_projects=list(snapshot.at_cap_projects),
-        reasons=explain_level(snapshot=snapshot, level=level, policy=active_policy),
+        reasons=explain_level(snapshot=snapshot, level=level, policy=active_policy, guardrails=guardrails),
+        guardrails=guardrails,
         source=snapshot.source,
         timestamp=snapshot.timestamp,
         global_pressure_count=global_pressure_count,
