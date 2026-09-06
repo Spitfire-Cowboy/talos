@@ -58,5 +58,5 @@ def test_save_cycles_writes_atomically(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(runtime, "TALOS_CYCLES_FILE", target)
     runtime.save_cycles(level=7, count=8, last_backlog=9)
     assert target.exists()
-    assert not target.with_suffix(".json.tmp").exists()
+    assert sorted(tmp_path.iterdir()) == [target]
     assert runtime.load_cycles() == {"level": 7, "count": 8, "last_backlog": 9}

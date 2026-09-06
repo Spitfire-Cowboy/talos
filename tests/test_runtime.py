@@ -1,8 +1,10 @@
 import json
+import threading
 from pathlib import Path
 
 import pytest
 
+import talos.runtime as runtime
 from talos.models import TalosPolicy, TalosSnapshot, TalosState
 from talos.runtime import (
     append_history,
@@ -36,6 +38,81 @@ def test_state_round_trip(tmp_path: Path) -> None:
     target = tmp_path / "cycles.json"
     save_state(level=2, count=4, last_backlog=11, path=target)
     assert load_state(path=target).to_dict() == {"level": 2, "count": 4, "last_backlog": 11}
+
+
+def test_atomic_write_uses_unique_staging_files_for_concurrent_calls(tmp_path: Path, monkeypatch) -> None:
+    target = tmp_path / "status.json"
+    original_replace = Path.replace
+    ready = {payload: threading.Event() for payload in ("first", "second")}
+    allow_replace = {payload: threading.Event() for payload in ("first", "second")}
+    replaced = {payload: threading.Event() for payload in ("first", "second")}
+    publications = []
+    errors = []
+
+    def controlled_replace(self: Path, destination: Path) -> Path:
+        requested_payload = self.read_text(encoding="utf-8")
+        ready[requested_payload].set()
+        assert allow_replace[requested_payload].wait(timeout=5)
+        published_payload = self.read_text(encoding="utf-8")
+        result = original_replace(self, destination)
+        publications.append((requested_payload, published_payload, self))
+        replaced[requested_payload].set()
+        return result
+
+    def write(payload: str) -> None:
+        try:
+            runtime._atomic_write_text(target, payload)
+        except Exception as exc:
+            errors.append(exc)
+
+    monkeypatch.setattr(Path, "replace", controlled_replace)
+    threads = [threading.Thread(target=write, args=(payload,)) for payload in ("first", "second")]
+    for thread in threads:
+        thread.start()
+
+    assert ready["first"].wait(timeout=5)
+    assert ready["second"].wait(timeout=5)
+    allow_replace["first"].set()
+    assert replaced["first"].wait(timeout=5)
+    allow_replace["second"].set()
+
+    for thread in threads:
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+
+    assert errors == []
+    assert [(requested, published) for requested, published, _path in publications] == [
+        ("first", "first"),
+        ("second", "second"),
+    ]
+    staging_paths = [path for _requested, _published, path in publications]
+    assert staging_paths[0] != staging_paths[1]
+    assert all(path.parent == target.parent for path in staging_paths)
+    assert target.read_text(encoding="utf-8") == "second"
+    assert sorted(tmp_path.iterdir()) == [target]
+
+
+def test_atomic_write_preserves_destination_and_cleans_up_when_replace_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    target = tmp_path / "status.json"
+    target.write_text("prior", encoding="utf-8")
+    staging_paths = []
+
+    def fail_replace(self: Path, destination: Path) -> Path:
+        staging_paths.append(self)
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        runtime._atomic_write_text(target, "new")
+
+    assert target.read_text(encoding="utf-8") == "prior"
+    assert len(staging_paths) == 1
+    assert staging_paths[0].parent == target.parent
+    assert not staging_paths[0].exists()
+    assert sorted(tmp_path.iterdir()) == [target]
 
 
 def test_history_appends_json_lines(tmp_path: Path) -> None:

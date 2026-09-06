@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -33,9 +34,21 @@ TALOS_POLICY_FILE = _path_from_env("TALOS_POLICY_FILE", "policy.json")
 
 def _atomic_write_text(target: Path, payload: str) -> None:
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    tmp_path = target.with_suffix(target.suffix + ".tmp")
-    tmp_path.write_text(payload, encoding="utf-8")
-    tmp_path.replace(target)
+    temporary = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=target.parent,
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+        delete=False,
+    )
+    tmp_path = Path(temporary.name)
+    try:
+        with temporary:
+            temporary.write(payload)
+        tmp_path.replace(target)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def load_state(path: Optional[Path] = None) -> TalosState:
